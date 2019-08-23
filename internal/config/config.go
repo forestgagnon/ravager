@@ -26,7 +26,7 @@ func FromFlags() *Config {
 
 	pflag.StringVarP(
 		&cfg.URL, "url", "u", "",
-		"URL to crush",
+		"URL to crush (required)",
 	)
 	pflag.StringVarP(
 		&cfg.Method, "method", "m", "GET",
