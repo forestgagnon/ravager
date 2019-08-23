@@ -6,6 +6,7 @@ The output gives you counts of each status code, and the requests-per-second (`r
 
 ## Usage
 
+### Docker
 https://hub.docker.com/r/forestgagnon/ravager
 
 You may need to pass in a special ulimit at high parallelism
@@ -21,4 +22,11 @@ docker run --ulimit nofile=20000:20000 --rm -it forestgagnon/ravager \
   --header "Authorization:Bearer foo" \
   --header "Content-Type:application/json" \
   --body '{"foo":"bar"}'
+```
+### Go toolchain
+
+Watch out for `ulimit` on number of files. `ulimit -n` sets it for your shell. e.g. if you use parallelism of `1000`, you should make sure the ulimit on number of open files is high enough, like `ulimit -n 2000`
+
+```
+go get github.com/forestgagnon/ravager
 ```
