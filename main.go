@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"math"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -40,6 +41,11 @@ func main() {
 
 	client = fasthttp.Client{
 		MaxConnsPerHost: cfg.Parallelism,
+		ReadTimeout:     cfg.Timeout,
+		WriteTimeout:    cfg.Timeout,
+		Dial: func(addr string) (net.Conn, error) {
+			return fasthttp.DialTimeout(addr, cfg.Timeout)
+		},
 	}
 
 	stats := &Stats{
@@ -57,27 +63,8 @@ func main() {
 	}
 
 	go printStatsLoop(doneCtx, stats)
-
-	maxConcurReqSem := make(chan struct{}, cfg.Parallelism)
 	wg := sync.WaitGroup{}
-
-	go func() {
-		handleReqDone := func() {
-			wg.Done()
-			<-maxConcurReqSem
-		}
-		if cfg.NumRequests == 0 {
-			log.Warn().Msg("WARNING: RUNNING IN INFINITE MODE!")
-		}
-		for reqNum := uint64(0); reqNum < cfg.NumRequests || cfg.NumRequests == 0; reqNum++ {
-			select {
-			case maxConcurReqSem <- struct{}{}:
-				wg.Add(1)
-				go req(handleReqDone, stats)
-			}
-		}
-		done()
-	}()
+	bringThePain(done, &wg, stats)
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -88,6 +75,56 @@ func main() {
 		wg.Wait()
 		printStats(stats)
 		log.Info().Msg("All done!")
+	}
+}
+
+func bringThePain(done func(), wg *sync.WaitGroup, stats *Stats) {
+	go func() {
+		if cfg.NumRequests == 0 {
+			log.Warn().Msg("WARNING: RUNNING IN INFINITE MODE!")
+		}
+		if cfg.ParallelismMode == config.ModeMaxInFlight {
+			maxConcurReqSem := make(chan struct{}, cfg.Parallelism)
+			handleReqDone := func() {
+				wg.Done()
+				<-maxConcurReqSem
+			}
+			performRequest := func() {
+				req(handleReqDone, stats)
+			}
+			cappedInFlightDispatch(maxConcurReqSem, wg, performRequest)
+		} else if cfg.ParallelismMode == config.ModeRpsStrict {
+			handleReqDone := func() {
+				wg.Done()
+			}
+			performRequest := func() {
+				req(handleReqDone, stats)
+			}
+			client.MaxConnsPerHost = math.MaxInt32 // set to unlimited
+			strictRpsDispatch(wg, performRequest)
+		}
+		done()
+	}()
+}
+
+func cappedInFlightDispatch(sema chan struct{}, wg *sync.WaitGroup, performRequest func()) {
+	for reqNum := uint64(0); reqNum < cfg.NumRequests || cfg.NumRequests == 0; reqNum++ {
+		select {
+		case sema <- struct{}{}:
+			wg.Add(1)
+			go performRequest()
+		}
+	}
+}
+
+func strictRpsDispatch(wg *sync.WaitGroup, performRequest func()) {
+	uint64para := uint64(cfg.Parallelism)
+	for reqNum := uint64(0); reqNum < cfg.NumRequests || cfg.NumRequests == 0; reqNum += uint64para {
+		time.Sleep(time.Second)
+		wg.Add(cfg.Parallelism)
+		for r := 0; r < cfg.Parallelism; r++ {
+			go performRequest()
+		}
 	}
 }
 
@@ -146,7 +183,7 @@ func printStats(stats *Stats) {
 	now := time.Now()
 	lastSnapshot := stats.LastStatSnapshot.Load().(*StatSnapshot)
 	sinceLast := now.Sub(lastSnapshot.Time)
-	rps := float64(total-lastSnapshot.TotalCount) / sinceLast.Seconds()
+	responsesPerSecond := float64(total-lastSnapshot.TotalCount) / sinceLast.Seconds()
 
 	stats.LastStatSnapshot.Store(&StatSnapshot{
 		Time:       now,
@@ -157,7 +194,7 @@ func printStats(stats *Stats) {
 		Uint64("completed", atomic.LoadUint64(&stats.CompleteCount)).
 		Uint64("failed", atomic.LoadUint64(&stats.FailCount)).
 		Uint64("total", total).
-		Float64("rps", math.Round(rps)).
+		Float64("responsesPerSecond", math.Round(responsesPerSecond)).
 		Fields(statuses).
 		Msg("stats")
 }
