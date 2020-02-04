@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/valyala/fasthttp"
 
@@ -33,6 +34,10 @@ type StatSnapshot struct {
 
 var client fasthttp.Client
 var cfg *config.Config
+
+func init() {
+	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+}
 
 func main() {
 	cfg = config.FromFlags()
