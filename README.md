@@ -14,7 +14,7 @@ You may need to pass in a special ulimit at high parallelism
 `docker run --rm -it forestgagnon/ravager --help`
 
 ```bash
-docker run --ulimit nofile=20000:20000 --rm -it forestgagnon/ravager \
+docker run --ulimit nofile=20000:20000 --rm -i forestgagnon/ravager \
   --url http://mysite.mysite \
   --method POST \
   --parallelism 1000 \
