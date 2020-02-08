@@ -48,7 +48,9 @@ func main() {
 	}
 
 	stats := &Stats{
-		StatusCounts: make([]uint64, 600),
+		// support any three digit status code
+		// https://tools.ietf.org/html/rfc7231#section-6
+		StatusCounts: make([]uint64, 1000),
 	}
 	stats.LastStatSnapshot.Store(&StatSnapshot{
 		Time:       time.Now(),
