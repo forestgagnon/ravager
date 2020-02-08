@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+release_image_name=forestgagnon/ravager
+patch_version="$(cat version.txt)"
+minor_version="$(echo "$patch_version" | sed 's/\.[^.]*$//')"
+
+image_and_patch_tag="$release_image_name:$patch_version"
+image_and_minor_tag="$release_image_name:$minor_version"
+image_and_latest_tag="$release_image_name:latest"
+
+disable_git_check="${I_KNOW_WHAT_IM_DOING:-no}"
+
+prompt_proceed() {
+  while true; do
+    read -p "$1 (y/n): " -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      break
+    elif [[ $REPLY =~ ^[Nn]$ ]]; then
+      exit 1
+    fi
+  done
+}
+
+ensure_master_branch() {
+  if [ "$disable_git_check" == "yes" ]; then
+    echo "WARNING: disabling master branch check"
+    return
+  fi
+  current_branch=$(git rev-parse --abbrev-ref HEAD | tr -d '\n';)
+  if [ "$current_branch" != "master" ]; then
+    echo "Releases must be run from the master branch, with no diffs against latest master"
+    exit 1
+  fi
+  git fetch origin
+  if ! git diff-index --quiet origin/master --; then
+    echo "Releases must be run from the master branch, with no diffs against latest master"
+    exit 1
+  fi
+}
+
+ensure_no_patch_republish() {
+  if docker pull "$image_and_patch_tag" 2>/dev/null; then
+    echo "This patch version has already been published. Please increment the version appropriately."
+    exit 1
+  fi
+}
+
+release_images() {
+  docker push "$image_and_patch_tag"
+  docker tag "$image_and_patch_tag" "$image_and_minor_tag"
+  docker push "$image_and_minor_tag"
+  docker tag "$image_and_patch_tag" "$image_and_latest_tag"
+  docker push "$image_and_latest_tag"
+}
+
+main() {
+  ensure_master_branch
+  ensure_no_patch_republish
+  echo "Building image"
+  make build IMAGE_NAME_AND_TAG="$image_and_patch_tag"
+  prompt_proceed "Are you sure you want to release $patch_version, $minor_version and latest of $release_image_name?"
+  echo "Releasing"
+  release_images
+  local git_tag="v$patch_version"
+  prompt_proceed "Are you sure you want to push git tag $git_tag?"
+  git tag "$git_tag"
+  git push "$git_tag"
+}
+
+main "$@"

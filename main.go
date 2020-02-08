@@ -23,7 +23,7 @@ type Stats struct {
 	CompleteCount    uint64
 	FailCount        uint64
 	TotalCount       uint64
-	StatusCounts     map[int]*uint64
+	StatusCounts     []uint64
 	LastStatSnapshot atomic.Value // StatSnapshot
 }
 
@@ -48,18 +48,14 @@ func main() {
 	}
 
 	stats := &Stats{
-		StatusCounts: make(map[int]*uint64),
+		// support any three digit status code
+		// https://tools.ietf.org/html/rfc7231#section-6
+		StatusCounts: make([]uint64, 1000),
 	}
 	stats.LastStatSnapshot.Store(&StatSnapshot{
 		Time:       time.Now(),
 		TotalCount: 0,
 	})
-
-	// Hydrate http status code map
-	for i := 100; i < 600; i++ {
-		count := uint64(0)
-		stats.StatusCounts[i] = &count
-	}
 
 	go printStatsLoop(doneCtx, stats)
 
@@ -125,7 +121,10 @@ func req(done func(), stats *Stats) {
 		log.Error().Err(err).Msg("request failed")
 	} else {
 		atomic.AddUint64(&stats.CompleteCount, uint64(1))
-		atomic.AddUint64(stats.StatusCounts[resp.StatusCode()], 1)
+		// Avoid panics if status code is too high
+		if statusCode := resp.StatusCode(); statusCode < len(stats.StatusCounts) {
+			atomic.AddUint64(&stats.StatusCounts[resp.StatusCode()], 1)
+		}
 	}
 	atomic.AddUint64(&stats.TotalCount, uint64(1))
 }
@@ -167,13 +166,10 @@ func printStats(stats *Stats) {
 		Msg("stats")
 }
 
-func presentStatuses(counts map[int]*uint64) map[string]interface{} {
+func presentStatuses(counts []uint64) map[string]interface{} {
 	presented := make(map[string]interface{})
 	for code, count := range counts {
-		if count == nil {
-			panic("damn, son")
-		}
-		countVal := atomic.LoadUint64(count)
+		countVal := atomic.LoadUint64(&count)
 		if countVal > 0 {
 			presented[strconv.Itoa(code)] = countVal
 		}
