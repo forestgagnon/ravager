@@ -67,7 +67,7 @@ main() {
   local git_tag="v$patch_version"
   prompt_proceed "Are you sure you want to push git tag $git_tag?"
   git tag "$git_tag"
-  git push "$git_tag"
+  git push origin "$git_tag"
 }
 
 main "$@"
