@@ -121,7 +121,10 @@ func req(done func(), stats *Stats) {
 		log.Error().Err(err).Msg("request failed")
 	} else {
 		atomic.AddUint64(&stats.CompleteCount, uint64(1))
-		atomic.AddUint64(&stats.StatusCounts[resp.StatusCode()], 1)
+		// Avoid panics if status code is too high
+		if statusCode := resp.StatusCode(); statusCode < len(stats.StatusCounts) {
+			atomic.AddUint64(&stats.StatusCounts[resp.StatusCode()], 1)
+		}
 	}
 	atomic.AddUint64(&stats.TotalCount, uint64(1))
 }
