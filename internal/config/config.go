@@ -50,9 +50,10 @@ func FromFlags() *Config {
 		&bodyStr, "body", "b", "",
 		"HTTP body",
 	)
+	pflag.Parse()
+
 	cfg.Body = []byte(bodyStr)
 
-	pflag.Parse()
 	if cfg.URL == "" {
 		log.Fatal().Msg("url is required")
 	}
