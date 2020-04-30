@@ -1,8 +1,10 @@
 # ravager -- a simple HTTP load generator
 
-This is a prototype work in progress. It makes a ton of requests. It also tries not to suck.
+It makes a ton of requests. It also tries not to suck.
 
-The output gives you counts of each status code, and the requests-per-second (`rps`) while it is running. The logs are structured JSON.
+Basic load generating functionality behind a simple CLI interface. No byzantine config files or complex setup.
+
+The output gives you counts of each status code, and the effective requests-per-second (`rps`) while it is running. The logs are structured JSON.
 
 ## Usage
 
