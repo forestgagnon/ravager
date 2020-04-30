@@ -2,7 +2,7 @@
 
 It makes a ton of requests. It also tries not to suck.
 
-Basic load generating functionality behind a simple CLI interface. No byzantine config files or complex setup.
+Basic load generating functionality behind a simple CLI. No byzantine config files or complex setup.
 
 The output gives you counts of each status code, and the effective requests-per-second (`rps`) while it is running. The logs are structured JSON.
 
