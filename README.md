@@ -30,5 +30,5 @@ docker run --ulimit nofile=20000:20000 --rm -i forestgagnon/ravager \
 Watch out for `ulimit` on number of files. `ulimit -n` sets it for your shell. e.g. if you use parallelism of `1000`, you should make sure the ulimit on number of open files is high enough, like `ulimit -n 2000`
 
 ```
-go get github.com/forestgagnon/ravager
+go install github.com/forestgagnon/ravager@latest
 ```
